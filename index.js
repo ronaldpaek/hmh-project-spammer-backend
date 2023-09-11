@@ -9,6 +9,18 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+const fetchChildrenRecursively = async (messageId) => {
+  const children = await prisma.message.findMany({
+    where: { parentId: messageId },
+  });
+
+  for (let i = 0; i < children.length; i++) {
+    children[i].children = await fetchChildrenRecursively(children[i].id);
+  }
+
+  return children;
+};
+
 // Root route
 app.get("/", (req, res) => {
   res.send({ success: true, message: "Welcome to Project Spammer!" });
@@ -19,13 +31,17 @@ app
   .route("/messages")
   .get(async (req, res, next) => {
     try {
-      const messages = await prisma.message.findMany({
-        include: {
-          children: true,
-        },
+      const topLevelMessages = await prisma.message.findMany({
+        where: { parentId: null },
       });
 
-      res.send({ success: true, messages });
+      for (let i = 0; i < topLevelMessages.length; i++) {
+        topLevelMessages[i].children = await fetchChildrenRecursively(
+          topLevelMessages[i].id
+        );
+      }
+
+      res.send({ success: true, messages: topLevelMessages });
     } catch (err) {
       next(err);
     }
