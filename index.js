@@ -11,7 +11,7 @@ app.use(cors());
 
 // Root route
 app.get("/", (req, res) => {
-  res.send({ success: true, message: "Hello world!" });
+  res.send({ success: true, message: "Welcome to Project Spammer!" });
 });
 
 // Messages routes
@@ -19,7 +19,12 @@ app
   .route("/messages")
   .get(async (req, res, next) => {
     try {
-      const messages = await prisma.message.findMany();
+      const messages = await prisma.message.findMany({
+        include: {
+          children: true,
+        },
+      });
+
       res.send({ success: true, messages });
     } catch (err) {
       next(err);
@@ -28,16 +33,25 @@ app
   .post(async (req, res, next) => {
     try {
       const { text, parentId } = req.body;
-      if (!text) throw new Error("Text is required!");
+
+      if (!text) {
+        throw new Error("Text is required!");
+      }
+
       if (parentId) {
         const parentMessage = await prisma.message.findUnique({
           where: { id: parentId },
         });
-        if (!parentMessage) throw new Error("Parent message not found!");
+
+        if (!parentMessage) {
+          throw new Error("Parent message not found!");
+        }
       }
+
       const message = await prisma.message.create({
         data: { text, parentId },
       });
+
       res.send({ success: true, message });
     } catch (err) {
       next(err);
@@ -49,12 +63,41 @@ app
   .put(async (req, res, next) => {
     try {
       const { messageId } = req.params;
-      const { text } = req.body;
-      if (!text) throw new Error("Text is required!");
+      const { text, likes } = req.body;
+
+      const existingMessage = await prisma.message.findUnique({
+        where: { id: messageId },
+        include: {
+          children: true,
+        },
+      });
+
+      if (!existingMessage) {
+        throw new Error(`Message with ID ${messageId} not found.`);
+      }
+
+      if (text === undefined && likes === undefined) {
+        throw new Error("Text or likes is required!");
+      }
+
+      const updateData = {};
+
+      if (text !== undefined) {
+        updateData.text = text;
+      }
+
+      if (likes !== undefined) {
+        if (typeof likes !== "number") {
+          throw new Error("Likes must be a number!");
+        }
+        updateData.likes = likes;
+      }
+
       const message = await prisma.message.update({
         where: { id: messageId },
-        data: { text },
+        data: updateData,
       });
+
       res.send({ success: true, message });
     } catch (err) {
       next(err);
@@ -63,9 +106,11 @@ app
   .delete(async (req, res, next) => {
     try {
       const { messageId } = req.params;
+
       const message = await prisma.message.delete({
         where: { id: messageId },
       });
+
       res.send({ success: true, message });
     } catch (err) {
       next(err);

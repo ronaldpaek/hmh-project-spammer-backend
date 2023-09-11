@@ -16,6 +16,6 @@ model Message {
   text      String
   parentId  String?   @map("parent_id")
   likes     Int       @default(0)
-  parent    Message?  @relation("MessageToMessage", fields: [parentId], references: [id])
-  children  Message[] @relation("MessageToMessage")
+  parent    Message?  @relation("ParentChild", fields: [parentId], references: [id])
+  children  Message[] @relation("ParentChild")
 }
